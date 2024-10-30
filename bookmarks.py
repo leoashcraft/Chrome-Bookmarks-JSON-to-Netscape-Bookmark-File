@@ -1,19 +1,12 @@
 import json
 import os
 from datetime import datetime
+import glob
 
-# List of possible file names
-possible_filenames = ["Bookmarks", "bookmarks.json", "Bookmarks.json"]
-
-def convert_to_html(json_data):
-    html_content = """<!DOCTYPE NETSCAPE-Bookmark-file-1>
-<!-- This is an automatically generated file.
-     It will be read and overwritten.
-     DO NOT EDIT! -->
-<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
-<TITLE>Bookmarks</TITLE>
-<H1>Bookmarks</H1>
-<DL><p>\n"""
+def convert_to_html(json_data, folder_name=None):
+    html_content = ""
+    if folder_name:
+        html_content += f'<DT><H3>{folder_name}</H3>\n<DL><p>\n'
 
     def process_bookmark(bookmark):
         url = bookmark.get("url", "")
@@ -40,21 +33,57 @@ def convert_to_html(json_data):
         if "children" in root_content:
             html_content += process_folder(root_content)
 
-    html_content += "</DL><p>\n"
+    if folder_name:
+        html_content += "</DL><p>\n"
+
     return html_content
 
-# Process each found file in possible_filenames
-for filename in possible_filenames:
-    if os.path.exists(filename):
-        with open(filename, "r") as file:
+# Find all .json files in the current directory
+json_files = glob.glob("*.json")
+
+# Generate .html file from .json file
+if len(json_files) == 1:
+    json_file = json_files[0]
+    with open(json_file, "r") as file:
+        bookmarks_json = json.load(file)
+
+    html_output = "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n"
+    html_output += "<!-- This is an automatically generated file. -->\n"
+    html_output += '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">\n'
+    html_output += "<TITLE>Bookmarks</TITLE>\n"
+    html_output += "<H1>Bookmarks</H1>\n"
+    html_output += "<DL><p>\n"
+    html_output += convert_to_html(bookmarks_json)
+    html_output += "</DL><p>\n"
+
+    base_name = os.path.splitext(json_file)[0]
+    unique_filename = f"{base_name}.html"
+    with open(unique_filename, "w") as file:
+        file.write(html_output)
+
+    print(f"Converted '{json_file}' to '{unique_filename}'")
+
+# Generate merged .html file if there's more than one .json file.
+elif len(json_files) > 1:
+    merged_html_content = "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n"
+    merged_html_content += "<!-- This is an automatically generated file. -->\n"
+    merged_html_content += '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">\n'
+    merged_html_content += "<TITLE>Bookmarks</TITLE>\n"
+    merged_html_content += "<H1>Bookmarks</H1>\n"
+    merged_html_content += "<DL><p>\n"
+
+    for index, json_file in enumerate(json_files):
+        with open(json_file, "r") as file:
             bookmarks_json = json.load(file)
-        
-        html_output = convert_to_html(bookmarks_json)
 
-        # Output filename will be based on the input filename
-        output_html_filename = f"{os.path.splitext(filename)[0]}.html"
+        folder_name = os.path.splitext(json_file)[0]
+        merged_html_content += convert_to_html(bookmarks_json, folder_name=folder_name)
 
-        with open(output_html_filename, "w") as html_file:
-            html_file.write(html_output)
+    merged_html_content += "</DL><p>\n"
 
-        print(f"Converted {filename} to {output_html_filename}")
+    with open("bookmarks.html", "w") as merged_file:
+        merged_file.write(merged_html_content)
+
+    print("Merged all JSON bookmarks into 'bookmarks.html'")
+else:
+    print("No JSON bookmarks files found.")
